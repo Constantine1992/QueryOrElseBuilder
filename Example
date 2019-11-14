@@ -1,0 +1,70 @@
+При фильтрации по ИЛИ если условия заранее известны, то проблем не возникает. Например:
+
+using (EmployersContext emp = new EmployersContext())
+{
+    IQueryable<Employee> emploers = emp.Emploeers.Where(n => n.Name == "Korvo" || n.LastName == "Attano" || n.Salary > 700);
+
+}
+
+Бывают случаи когда условия фильтрации заранее не известны, а зависят от выбора пользователя. Для фильтрации по "И" это решается просто.
+
+using (EmployersContext emp = new EmployersContext())
+{
+
+    IQueryable<Employee> emploers = emp.Emploeers;
+
+    if(//условие)
+
+   {
+
+        emploers  = emploers .Where(n => n.Name == "Korvo" );
+
+   } 
+
+   if(//условие)
+
+   {
+
+        emploers  = emploers .Where(n => n.LastName == "Attano" );
+
+   }
+
+  if(//условие)
+
+   {
+
+        emploers  = emploers .Where(n => n.Salary > 700 );
+
+   }
+
+}
+
+То есть дерево выражений строится в runtime и результат фильтрации будет аналогичен если бы сформировали так : emp.Emploeers.Where(n => n.Name == "Korvo" && n.LastName == "Attano" && n.Salary > 700). Where позволяет фильтровать по "И"
+
+Для "Или" нет метода расширения в  стандартном Queryable.  Но мы можем сделать свой механизм построения запроса по "И".  Я делал так:
+
+using (EmployersContext emp = new EmployersContext())
+{
+    IQueryable<Employee> emploers = emp.Emploeers.Where(n => n.Salary > 600); ///  Where(n => n.Salary > 600) - начальная фильтрация, но она не обязательна, можно просто написать IQueryable<Employee> emploers = emp.Emploeers;
+
+    // собственно создаем наш  строитель запросов (smile)))
+    OrElseBuilder<Employee> filter = OrElseBuilder<Employee>.CreateBuilder();
+    if (условие)
+    {
+
+        filter.AppendOrElse(n => n.LastName.Contains("Kaldwin"));
+        
+    }
+    if (условие)
+    {
+
+         /// внутри лямбда выражения можем использовать операторы &&, ||,  == , != > , <. и тд
+         filter.AppendOrElse(n => n.LastName == "Attano" && n.FirstName.Contains("Korvo"));
+    }
+    if (условие)
+    {
+         filter.AppendOrElse(l => l.FirstName.Contains("Va"));
+    }
+    emploers = emploers.Where(filter.GetFilter());
+
+}
